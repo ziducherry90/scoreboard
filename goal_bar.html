@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Helix League Scoreboard</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Configure Babel to use the classic JSX runtime (React.createElement) to avoid import errors -->
+    <script>
+        Babel.registerPreset('react-classic', {
+            presets: [
+                [Babel.availablePresets['react'], { runtime: 'classic' }]
+            ]
+        });
+    </script>
+
+    <!-- Custom Styles for Seamless Ticker Animation -->
+    <style>
+        @keyframes marquee {
+            0% {
+                transform: translateX(0);
+            }
+
+            100% {
+                transform: translateX(-50%);
+            }
+        }
+
+        .animate-marquee {
+            animation: marquee 25s linear infinite;
+            width: max-content;
+        }
+
+        /* Pause ticker on hover if needed */
+        .animate-marquee:hover {
+            animation-play-state: paused;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root"></div>
+
+    
+    <!-- Firebase Setup -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-analytics.js";
+        import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBQHLPDg78vUGqRNV3RO2jsgUsy7KIiPZA",
+            authDomain: "helix-scored-broad.firebaseapp.com",
+            projectId: "helix-scored-broad",
+            storageBucket: "helix-scored-broad.firebasestorage.app",
+            messagingSenderId: "36097019302",
+            appId: "1:36097019302:web:e7347cdbe7637b96cc5367",
+            measurementId: "G-KWTLDRXW3K"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const db = getDatabase(app);
+        
+        window.firebaseDb = db;
+        window.firebaseRef = ref;
+        window.firebaseSet = set;
+        window.firebaseOnValue = onValue;
+        window.firebaseGet = get;
+        
+        window.dispatchEvent(new Event('firebaseReady'));
+    </script>
+
+    <script type="text/babel" data-presets="react-classic">
+        const { useState, useEffect, useRef } = React;
+
+        // Nation Options for the Helix League World Cup Edition
+        const NATION_OPTIONS = [
+            {
+                name: 'Brazil', code: 'BRA', emoji: '🇧🇷', flag: 'https://flagcdn.com/w160/br.png', color: '#009b3a',
+                squad: [
+                    { pos: 'FW', name: 'Rokshim Uddin (C)' },
+                    { pos: 'GK', name: 'Rafayat Hassan' },
+                    { pos: 'DEF', name: 'Dewan Muhammad' },
+                    { pos: 'DEF', name: 'Zehad' },
+                    { pos: 'DEF', name: 'Mahbubur Rahman' },
+                    { pos: 'MID', name: 'Hamim sarkar' },
+                    { pos: 'MID', name: 'Shakibull Hasan' }
+                ]
+            },
+            {
+                name: 'Argentina', code: 'ARG', emoji: '🇦🇷', flag: 'https://flagcdn.com/w160/ar.png', color: '#74acdf',
+                squad: [
+                    { pos: 'DEF', name: 'Adnan Hossain Adil (C)' },
+                    { pos: 'GK', name: 'Golam Rabby' },
+                    { pos: 'GK', name: 'Rahmat Rafi' },
+                    { pos: 'DEF', name: 'Habibul Hasan pranto' },
+                    { pos: 'MID', name: 'Rayhan Khan' },
+                    { pos: 'MID', name: 'Arafat Shuvo' },
+                    { pos: 'FWD', name: 'Tahmidur Rahman' }
+                ]
+            },
+            {
+                name: 'Spain', code: 'ESP', emoji: '🇪🇸', flag: 'https://flagcdn.com/w160/es.png', color: '#c60d1f',
+                squad: [
+                    { pos: 'GK', name: 'Ansarul hoque Sakin (C)' },
+                    { pos: 'DEF', name: 'Tadil salawwat' },
+                    { pos: 'DEF', name: 'Fozle Rabby' },
+                    { pos: 'DEF', name: 'Jahid Hasan Jisan' },
+                    { pos: 'MID', name: 'Abdullah Al Sabik' },
+                    { pos: 'MID', name: 'Ridwan Khan Niloy' },
+                    { pos: 'MID', name: 'Ashru Kh' }
+                ]
+            },
+            {
+                name: 'Germany', code: 'GER', emoji: '🇩🇪', flag: 'https://flagcdn.com/w160/de.png', color: '#000000',
+                squad: [
+                    { pos: 'MID', name: 'Abdullah Al Siam (C)' },
+                    { pos: 'GK', name: 'Sifat Hossain' },
+                    { pos: 'DEF', name: 'Arman Khan' },
+                    { pos: 'DEF', name: 'Alif Mashrafi' },
+                    { pos: 'DEF', name: 'Tahmid chowdhury' },
+                    { pos: 'DEF', name: 'RM Shawon' },
+                    { pos: 'DEF', name: 'Yousuf' }
+                ]
+            },
+            {
+                name: 'Portugal', code: 'POR', emoji: '🇵🇹', flag: 'https://flagcdn.com/w160/pt.png', color: '#ff0000',
+                squad: [
+                    { pos: 'MID', name: 'Abdullah Alfa (C)' },
+                    { pos: 'GK', name: 'Montasir Zidne' },
+                    { pos: 'DEF', name: 'Naim hossain' },
+                    { pos: 'DEF', name: 'Nazmul Hasan' },
+                    { pos: 'MID', name: 'Nafi' },
+                    { pos: 'MID', name: 'Siam Sarkar' },
+                    { pos: 'FWD', name: 'Pavel Mojumber' }
+                ]
+            },
+            {
+                name: 'France', code: 'FRA', emoji: '🇫🇷', flag: 'https://flagcdn.com/w160/fr.png', color: '#002654',
+                squad: [
+                    { pos: 'GK', name: 'ASIF MAHMUD (C)' },
+                    { pos: 'DEF', name: 'Absaruzzaman' },
+                    { pos: 'DEF', name: 'SADMAN SAKIB' },
+                    { pos: 'MID', name: 'Tamjid Ashfi' },
+                    { pos: 'MID', name: 'Nuhin Iqbal' },
+                    { pos: 'MID', name: 'Masum hossain' },
+                    { pos: 'FWD', name: 'Mahafuj Anik' }
+                ]
+            },
+        ];
+
+        // Sponsor Options
+        const SPONSOR_OPTIONS = [
+            {
+                name: "UniWay",
+                type: "Title Sponsor",
+                details: "The Smart Way to Study Abroad",
+                logo: "uniway.png"
+            },
+            {
+                name: "Kick.Official",
+                type: "Venue Partner",
+                details: "Game Starts Here",
+                logo: "kick.png"
+            },
+            {
+                name: "Driviso",
+                type: "Production Partner",
+                details: "Visual Innovation",
+                logo: "driviso.png"
+            },
+            {
+                name: "skin'O",
+                type: "Gift Partner",
+                details: "Keeping our athletes refreshed",
+                logo: "skino.png"
+            },
+            {
+                name: "INK 173",
+                type: "Auction Venue Partner",
+                details: "Innovation, Networking, Knowledge",
+                logo: "ink173.png"
+            },
+            {
+                name: "Bangladesh Football Live",
+                type: "Online Media Partner",
+                details: "Online Media Partner",
+                logo: "bd_football_live.png"
+            },
+            {
+                name: "SportsTab",
+                type: "Online Media Partner",
+                details: "Online Media Partner",
+                logo: "sportstab.png"
+            },
+            {
+                name: "Aliza's Kitchen",
+                type: "Official Cake Partner",
+                details: "Celebrate Your Happiness",
+                logo: "alizas_kitchen.jpg"
+            }
+        ];
+
+        // Fallback image handler for missing flag images
+        const handleImageError = (e) => {
+            e.target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSIyOCI+PHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjI4IiBmaWxsPSIjY2NjIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiM2NjYiIGFsaWdubWVudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5GbGFnPC90ZXh0Pjwvc3ZnPg==';
+        };
+
+        
+        
+        
+        const useSharedState = (key, initialValue, isController) => {
+            const [state, setState] = React.useState(initialValue);
+            const [isLoaded, setIsLoaded] = React.useState(false);
+            const [fbReady, setFbReady] = React.useState(!!window.firebaseDb);
+
+            React.useEffect(() => {
+                if (!window.firebaseDb) {
+                    const listener = () => setFbReady(true);
+                    window.addEventListener('firebaseReady', listener);
+                    return () => window.removeEventListener('firebaseReady', listener);
+                }
+            }, []);
+
+            // Initial Load for controller
+            React.useEffect(() => {
+                if (isController && fbReady && !isLoaded) {
+                    const stateRef = window.firebaseRef(window.firebaseDb, 'scoreboard/' + key);
+                    window.firebaseGet(stateRef).then((snapshot) => {
+                        if (snapshot.exists()) {
+                            setState(snapshot.val());
+                        }
+                        setIsLoaded(true);
+                    });
+                }
+            }, [key, isController, fbReady, isLoaded]);
+
+            // Write to Firebase (Controller only)
+            React.useEffect(() => {
+                if (isController && fbReady && isLoaded) {
+                    const stateRef = window.firebaseRef(window.firebaseDb, 'scoreboard/' + key);
+                    window.firebaseSet(stateRef, state);
+                }
+            }, [key, state, isController, fbReady, isLoaded]);
+
+            // Listen to Firebase (Viewer only)
+            React.useEffect(() => {
+                if (!isController && fbReady) {
+                    const stateRef = window.firebaseRef(window.firebaseDb, 'scoreboard/' + key);
+                    const unsubscribe = window.firebaseOnValue(stateRef, (snapshot) => {
+                        const val = snapshot.val();
+                        if (val !== null) {
+                            setState(val);
+                        }
+                    });
+                    return () => unsubscribe();
+                }
+            }, [key, isController, fbReady]);
+
+            return [state, setState];
+        };
+
+        const HelixScoreboard = () => {
+            const isController = false; // Broadcast Overlay
+
+            const [team1, setTeam1] = useSharedState('hl_team1', NATION_OPTIONS[0], isController);
+            const [team2, setTeam2] = useSharedState('hl_team2', NATION_OPTIONS[1], isController);
+            const [score1, setScore1] = useSharedState('hl_score1', 0, isController);
+            const [score2, setScore2] = useSharedState('hl_score2', 0, isController);
+
+            const [time, setTime] = useSharedState('hl_time', 0, isController);
+            const [isRunning, setIsRunning] = useSharedState('hl_isRunning', false, isController);
+            const [half, setHalf] = useSharedState('hl_half', 1, isController);
+            const [extraTime, setExtraTime] = useSharedState('hl_extraTime', 0, isController);
+            const timerRef = React.useRef(null);
+
+            const [events, setEvents] = useSharedState('hl_events', [], isController);
+
+            const [broadcastMode, setBroadcastMode] = useSharedState('hl_broadcastMode', true, isController);
+            const [greenScreen, setGreenScreen] = useSharedState('hl_greenScreen', false, isController);
+            const [squadDisplay, setSquadDisplay] = useSharedState('hl_squadDisplay', { active: false, teamNum: null }, isController);
+
+            const [matchPhase, setMatchPhase] = useSharedState('hl_matchPhase', 'Group Stage', isController);
+            const [penalties, setPenalties] = useSharedState('hl_penalties', { active: false, kicks1: [], kicks2: [] }, isController);
+
+            const [overlayL, setOverlayL] = useSharedState('hl_overlayL', false, isController);
+            const [overlayTicker, setOverlayTicker] = useSharedState('hl_overlayTicker', false, isController);
+            const [activeSponsorIndex, setActiveSponsorIndex] = useSharedState('hl_activeSponsorIndex', 0, isController);
+            const activeSponsor = SPONSOR_OPTIONS[activeSponsorIndex];
+            const [tickerText1, setTickerText1] = useSharedState('hl_tickerText1', "Brazil clinches dramatic 2-1 victory over Argentina in opener", isController);
+            const [tickerText2, setTickerText2] = useSharedState('hl_tickerText2', "Spain vs Germany - Kickoff at 8:30 PM Local Time", isController);
+
+            const [playerGraphic, setPlayerGraphic] = useSharedState('hl_playerGraphic', { active: false, type: '', player: null, team: null }, isController);
+            const [graphicTeamNum, setGraphicTeamNum] = React.useState(1);
+            const [graphicPlayerName, setGraphicPlayerName] = React.useState('');
+
+            const penScore1 = penalties.kicks1.filter(k => k === 'goal').length;
+            const penScore2 = penalties.kicks2.filter(k => k === 'goal').length;
+
+            const [goalAlert, setGoalAlert] = useSharedState('hl_goalAlert', { active: false, team: null }, isController);
+            const goalTimeoutRef = useRef(null);
+
+            useEffect(() => {
+                if (isRunning) {
+                    timerRef.current = setInterval(() => {
+                        setTime((prevTime) => prevTime + 1);
+                    }, 1000);
+                } else {
+                    clearInterval(timerRef.current);
+                }
+                return () => clearInterval(timerRef.current);
+            }, [isRunning]);
+
+            // Keep player graphic selection valid if team changes
+            useEffect(() => {
+                const team = graphicTeamNum === 1 ? team1 : team2;
+                if (team && team.squad && team.squad.length > 0) {
+                    if (!team.squad.find(p => p.name === graphicPlayerName)) {
+                        setGraphicPlayerName(team.squad[0].name);
+                    }
+                }
+            }, [graphicTeamNum, team1, team2]);
+
+            const formatTime = (totalSeconds) => {
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = totalSeconds % 60;
+                return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            };
+
+            const addEvent = (teamCode, type, details = '') => {
+                const eventTime = Math.floor(time / 60);
+                setEvents([{ time: eventTime, team: teamCode, type, details }, ...events]);
+            };
+
+            const triggerGoalAlert = (team) => {
+                if (goalTimeoutRef.current) clearTimeout(goalTimeoutRef.current);
+                setGoalAlert({ active: true, team });
+                goalTimeoutRef.current = setTimeout(() => {
+                    setGoalAlert({ active: false, team: null });
+                }, 6000); // Display for 6 seconds
+            };
+
+            const triggerPlayerGraphic = (type) => {
+                const team = graphicTeamNum === 1 ? team1 : team2;
+                const player = team.squad.find(p => p.name === graphicPlayerName) || team.squad[0];
+                setPlayerGraphic({ active: true, type, player, team });
+            };
+
+            const handleScoreChange = (teamNum, increment) => {
+                if (teamNum === 1) {
+                    const newScore = Math.max(0, score1 + increment);
+                    setScore1(newScore);
+                    if (increment > 0) {
+                        addEvent(team1.code, 'GOAL');
+                        triggerGoalAlert(team1);
+                    }
+                } else {
+                    const newScore = Math.max(0, score2 + increment);
+                    setScore2(newScore);
+                    if (increment > 0) {
+                        addEvent(team2.code, 'GOAL');
+                        triggerGoalAlert(team2);
+                    }
+                }
+            };
+
+            const executeReset = () => {
+                setScore1(0);
+                setScore2(0);
+                setTime(0);
+                setIsRunning(false);
+                setHalf(1);
+                setExtraTime(0);
+                setEvents([]);
+                setSquadDisplay({ active: false, teamNum: null });
+                setPenalties({ active: false, kicks1: [], kicks2: [] });
+                setPlayerGraphic({ active: false, type: '', player: null, team: null });
+                setShowResetConfirm(false);
+            };
+
+            const handlePenaltyKick = (teamNum, result) => {
+                setPenalties(prev => {
+                    const key = teamNum === 1 ? 'kicks1' : 'kicks2';
+                    return { ...prev, [key]: [...prev[key], result] };
+                });
+            };
+
+            const undoPenaltyKick = (teamNum) => {
+                setPenalties(prev => {
+                    const key = teamNum === 1 ? 'kicks1' : 'kicks2';
+                    const newKicks = [...prev[key]];
+                    newKicks.pop();
+                    return { ...prev, [key]: newKicks };
+                });
+            };
+
+            return (
+                <div className={`relative min-h-screen font-sans overflow-x-hidden ${broadcastMode ? (greenScreen ? 'bg-[#00FF00]' : 'bg-[url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+CjxyZWN0IHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCIgZmlsbD0iI2YwZjBmMCIvPgo8cmVjdCB4PSIxMCIgeT0iMTAiIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCIgZmlsbD0iI2YwZjBmMCIvPgo8L3N2Zz4=")]') : 'bg-slate-900 text-slate-200'}`}>
+
+                    {/* Broadcast Overlay Mode */}
+                    <div className={`w-full flex justify-center transition-all duration-500 ${broadcastMode ? 'pt-16' : 'pt-8 pb-10 border-b border-slate-700'}`}>
+
+                        {/* Starting VII Graphic - Centered below scorebug */}
+                        <div
+                            className={`absolute top-44 left-1/2 -translate-x-1/2 z-30 transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] origin-top ${broadcastMode && squadDisplay.active && !playerGraphic.active ? 'scale-100 opacity-100 translate-y-0' : 'scale-90 opacity-0 -translate-y-8 pointer-events-none'}`}
+                        >
+                            <div className="bg-slate-900/95 backdrop-blur-xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] rounded-2xl overflow-hidden w-[750px]">
+                                {/* Header */}
+                                <div className="flex items-center px-8 py-5 border-b border-white/10 relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${(squadDisplay.teamNum === 1 ? team1 : team2)?.color} 0%, rgba(15,23,42,1) 100%)` }}>
+                                    <div className="absolute right-0 top-0 bottom-0 opacity-10 flex items-center">
+                                        <span className="text-[120px] leading-none font-black italic -mr-4">{(squadDisplay.teamNum === 1 ? team1 : team2)?.code}</span>
+                                    </div>
+
+                                    <img onError={handleImageError} src={(squadDisplay.teamNum === 1 ? team1 : team2)?.flag} alt="flag" className="w-24 h-16 object-cover rounded-md shadow-[0_5px_15px_rgba(0,0,0,0.5)] border border-white/20 mr-6 relative z-10" />
+                                    <div className="flex flex-col relative z-10">
+                                        <span className="text-white text-4xl font-black uppercase tracking-widest drop-shadow-md">{(squadDisplay.teamNum === 1 ? team1 : team2)?.name}</span>
+                                        <span className="text-white/90 text-sm font-bold tracking-[0.4em] mt-1">STARTING VII</span>
+                                    </div>
+                                </div>
+                                {/* Players Grid */}
+                                <div className="grid grid-cols-2 gap-x-10 gap-y-3 p-8 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')]">
+                                    {(squadDisplay.teamNum === 1 ? team1 : team2)?.squad?.map((player, idx) => (
+                                        <div key={idx} className="flex items-center bg-white/5 rounded-r-full overflow-hidden border-l-4 shadow-sm" style={{ borderColor: (squadDisplay.teamNum === 1 ? team1 : team2)?.color }}>
+                                            <div className="bg-slate-950 text-white font-black w-14 py-2.5 text-center text-sm md:text-base tracking-widest">{player.pos}</div>
+                                            <div className="text-white font-bold px-5 text-sm md:text-base tracking-wide uppercase truncate">{player.name}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Scorebug Main Container */}
+                        <div className={`transition-transform duration-700 ease-out flex flex-col drop-shadow-2xl relative z-20 ${broadcastMode ? 'scale-125' : 'scale-100'}`}>
+                            <div className="relative z-20 drop-shadow-xl">
+                                {/* Top Bar - Tournament Info WITH VENUE ADDED */}
+                                <div className="flex items-center justify-between bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-600 px-5 py-1 rounded-t-md shadow-inner border-b border-yellow-700/50">
+                                    <span className="text-[9px] font-black uppercase tracking-[0.25em] text-amber-950">
+                                        Helix League 4.0 <span className="opacity-50 mx-1.5 font-sans">|</span> Kick, Aftab Nagar
+                                    </span>
+                                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-950 ml-6">{matchPhase}</span>
+                                </div>
+
+                                {/* Main Data Container */}
+                                <div className="flex flex-col bg-slate-900/95 backdrop-blur-md rounded-b-md shadow-2xl border border-white/10 overflow-hidden">
+                                    <div className="flex">
+                                        {/* Team 1 */}
+                                        <div className="flex items-center px-3 py-2 relative min-w-[140px]">
+                                            <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: team1.color }}></div>
+                                            <img onError={handleImageError} src={team1.flag} alt={`${team1.code} flag`} className="w-10 h-7 object-cover rounded-sm shadow-md border border-white/10 mr-3" />
+                                            <span className="text-3xl font-black tracking-widest text-white">{team1.code}</span>
+                                        </div>
+
+                                        {/* Score Section */}
+                                        <div className="flex items-center bg-slate-950/80 px-5 py-2 border-x border-white/5 relative">
+                                            <div className={`absolute inset-0 bg-white/20 transition-opacity duration-300 ${goalAlert.active ? 'opacity-100 animate-pulse' : 'opacity-0'}`}></div>
+                                            <span className={`text-4xl font-black text-white w-9 text-center tabular-nums relative z-10 transition-transform ${goalAlert.active && goalAlert.team?.code === team1.code ? 'scale-125 text-yellow-400' : ''}`}>{score1}</span>
+                                            <span className="mx-1 text-slate-600 font-black text-xl mb-1 relative z-10">-</span>
+                                            <span className={`text-4xl font-black text-white w-9 text-center tabular-nums relative z-10 transition-transform ${goalAlert.active && goalAlert.team?.code === team2.code ? 'scale-125 text-yellow-400' : ''}`}>{score2}</span>
+                                        </div>
+
+                                        {/* Team 2 */}
+                                        <div className="flex items-center justify-end px-3 py-2 relative min-w-[140px]">
+                                            <span className="text-3xl font-black tracking-widest text-white">{team2.code}</span>
+                                            <img onError={handleImageError} src={team2.flag} alt={`${team2.code} flag`} className="w-10 h-7 object-cover rounded-sm shadow-md border border-white/10 ml-3" />
+                                            <div className="absolute right-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: team2.color }}></div>
+                                        </div>
+
+                                        {/* Match Clock Section */}
+                                        <div className="flex items-stretch bg-zinc-100 border-l-2 border-slate-800">
+                                            <div className="flex flex-col items-center justify-center px-4 py-1 min-w-[90px]">
+                                                <span className="text-3xl font-bold text-slate-900 tracking-tight tabular-nums mt-0.5">
+                                                    {formatTime(time)}
+                                                </span>
+                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-[-2px]">
+                                                    {half === 1 ? '1st Half' : half === 2 ? '2nd Half' : 'Extra'}
+                                                </span>
+                                            </div>
+
+                                            {/* Stoppage Time Badge */}
+                                            {extraTime > 0 && (
+                                                <div className="bg-red-600 flex items-center justify-center px-3 shadow-inner">
+                                                    <span className="text-white font-black text-2xl animate-pulse">
+                                                        +{extraTime}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Penalty Shootout Bar */}
+                                    {penalties.active && (
+                                        <div className="flex w-full bg-slate-800 border-t border-slate-950 py-2 justify-center items-center gap-8 shadow-inner transition-all duration-300">
+                                            {/* Team 1 Dots & Score */}
+                                            <div className="flex items-center gap-4">
+                                                <div className="flex gap-1.5">
+                                                    {Array.from({ length: Math.max(3, penalties.kicks1.length, penalties.kicks2.length) }).map((_, i) => {
+                                                        const status = penalties.kicks1[i];
+                                                        return (
+                                                            <div key={i} className={`w-3 h-3 rounded-full border border-black/30 shadow-inner ${status === 'goal' ? 'bg-green-500' : status === 'miss' ? 'bg-red-500' : 'bg-slate-600'}`} />
+                                                        );
+                                                    })}
+                                                </div>
+                                                <span className="text-yellow-400 font-black text-2xl w-6 text-center tabular-nums leading-none">{penScore1}</span>
+                                            </div>
+
+                                            <span className="text-white text-[10px] tracking-[0.3em] font-bold uppercase">Pens</span>
+
+                                            {/* Team 2 Score & Dots */}
+                                            <div className="flex items-center gap-4 flex-row-reverse">
+                                                <div className="flex gap-1.5 flex-row-reverse">
+                                                    {Array.from({ length: Math.max(3, penalties.kicks1.length, penalties.kicks2.length) }).map((_, i) => {
+                                                        const status = penalties.kicks2[i];
+                                                        return (
+                                                            <div key={i} className={`w-3 h-3 rounded-full border border-black/30 shadow-inner ${status === 'goal' ? 'bg-green-500' : status === 'miss' ? 'bg-red-500' : 'bg-slate-600'}`} />
+                                                        );
+                                                    })}
+                                                </div>
+                                                <span className="text-yellow-400 font-black text-2xl w-6 text-center tabular-nums leading-none">{penScore2}</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Goal Alert Dropdown Animation */}
+                            <div
+                                className="absolute left-8 right-8 z-10 transition-all duration-700 ease-out flex justify-center pointer-events-none"
+                                style={{
+                                    bottom: '1px',
+                                    transform: goalAlert.active ? 'translateY(100%)' : 'translateY(0)',
+                                    opacity: goalAlert.active ? 1 : 0,
+                                    visibility: goalAlert.active || goalAlert.team ? 'visible' : 'hidden'
+                                }}
+                            >
+                                <div className="w-full bg-white overflow-hidden rounded-b-xl shadow-[0_10px_25px_rgba(0,0,0,0.5)] border-x border-b border-slate-300">
+                                    <div className="flex items-center justify-center gap-6 py-2 px-4 relative bg-gradient-to-r from-slate-100 via-white to-slate-100">
+                                        <div className="absolute inset-0 opacity-40 bg-gradient-to-r from-transparent via-yellow-400 to-transparent animate-pulse"></div>
+                                        <img onError={handleImageError} src={goalAlert.team?.flag} alt="flag" className="w-12 h-8 object-cover rounded-sm shadow-md border border-black/10 relative z-10 animate-bounce" style={{ animationDelay: '0.1s' }} />
+                                        <div className="flex flex-col items-center justify-center relative z-10">
+                                            <span className="text-3xl font-black italic tracking-[0.2em] text-slate-900 leading-none drop-shadow-sm">GOAL</span>
+                                            <span className="text-xs font-black uppercase tracking-widest mt-1" style={{ color: goalAlert.team?.color }}>
+                                                {goalAlert.team?.name}
+                                            </span>
+                                        </div>
+                                        <img onError={handleImageError} src={goalAlert.team?.flag} alt="flag" className="w-12 h-8 object-cover rounded-sm shadow-md border border-black/10 relative z-10 animate-bounce" style={{ animationDelay: '0.2s' }} />
+                                        <div className="absolute bottom-0 left-0 right-0 h-1.5" style={{ backgroundColor: goalAlert.team?.color }}></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        
+                        </div>
+
+                    {/* L-Shape Sponsor Overlay (Broadcast Mode Only) */}
+                    {broadcastMode && overlayL && (
+                        <div className={`fixed left-0 ${overlayTicker ? 'bottom-12' : 'bottom-0'} w-72 bg-slate-900/95 border-t-2 border-r-2 border-amber-500/80 rounded-tr-3xl shadow-[10px_-10px_30px_rgba(0,0,0,0.5)] flex flex-col items-center justify-center p-6 transition-all duration-500 z-50`} style={{ height: '360px' }}>
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-400 to-transparent"></div>
+                            <span className="text-amber-500 text-[10px] font-black tracking-[0.4em] uppercase mb-6 mt-2 text-center w-full">{activeSponsor.type}</span>
+
+                            {/* Sponsor Logo */}
+                            <div className="relative w-32 h-32 mb-8 flex items-center justify-center bg-white rounded-xl shadow-[0_0_15px_rgba(255,255,255,0.1)] p-2">
+                                <img
+                                    src={activeSponsor.logo}
+                                    alt={activeSponsor.name}
+                                    className="w-full h-full object-contain"
+                                />
+                            </div>
+
+                            <h3 className="text-white font-black text-2xl text-center leading-none uppercase tracking-wide mb-3">{activeSponsor.name}</h3>
+                            <div className="h-px w-16 bg-amber-500/50 mb-3"></div>
+                            <p className="text-slate-300 text-[11px] text-center font-bold tracking-[0.2em] uppercase leading-relaxed px-2">{activeSponsor.details}</p>
+                        </div>
+                    )}
+
+                    {/* Match News & Upcoming Ticker (Broadcast Mode Only) */}
+                    {broadcastMode && overlayTicker && (
+                        <div className="fixed bottom-0 left-0 right-0 h-12 bg-slate-950 border-t-2 border-amber-500/80 flex z-50 shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
+                            {/* L-Shape Bottom Corner (Aligns with left panel to form the 'L') */}
+                            {overlayL ? (
+                                <div className="w-72 bg-slate-900/95 border-r-2 border-amber-500/80 flex items-center justify-center shrink-0 relative overflow-hidden">
+                                    <div className="absolute inset-0 opacity-10 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')]"></div>
+                                    <span className="text-amber-500 font-black tracking-[0.3em] uppercase text-[10px] relative z-10">Helix League</span>
+                                </div>
+                            ) : (
+                                <div className="bg-gradient-to-r from-amber-600 to-amber-500 px-6 flex items-center justify-center shrink-0 z-10 shadow-[5px_0_15px_rgba(0,0,0,0.5)]">
+                                    <span className="text-amber-950 font-black tracking-widest uppercase text-sm">HEADLINES</span>
+                                </div>
+                            )}
+
+                            {/* Marquee Scrolling Area */}
+                            <div className="flex-1 overflow-hidden relative flex items-center bg-slate-900/90">
+                                <div className="flex animate-marquee">
+                                    {/* Group 1 */}
+                                    <div className="flex items-center pr-24">
+                                        <span className="flex items-center mr-24 text-sm font-bold uppercase tracking-wider text-slate-200">
+                                            <span className="bg-slate-800 border border-slate-700 text-amber-500 px-2.5 py-0.5 rounded mr-3 text-[10px] shadow-sm tracking-widest">LAST MATCH</span>
+                                            {tickerText1}
+                                        </span>
+                                        <span className="flex items-center text-sm font-bold uppercase tracking-wider text-slate-200">
+                                            <span className="bg-slate-800 border border-slate-700 text-amber-500 px-2.5 py-0.5 rounded mr-3 text-[10px] shadow-sm tracking-widest">UPCOMING</span>
+                                            {tickerText2}
+                                        </span>
+                                    </div>
+                                    {/* Group 2 (Duplicate for seamless loop) */}
+                                    <div className="flex items-center pr-24">
+                                        <span className="flex items-center mr-24 text-sm font-bold uppercase tracking-wider text-slate-200">
+                                            <span className="bg-slate-800 border border-slate-700 text-amber-500 px-2.5 py-0.5 rounded mr-3 text-[10px] shadow-sm tracking-widest">LAST MATCH</span>
+                                            {tickerText1}
+                                        </span>
+                                        <span className="flex items-center text-sm font-bold uppercase tracking-wider text-slate-200">
+                                            <span className="bg-slate-800 border border-slate-700 text-amber-500 px-2.5 py-0.5 rounded mr-3 text-[10px] shadow-sm tracking-widest">UPCOMING</span>
+                                            {tickerText2}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    { }
+                    
+                    </div>
+                );
+            };
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(<HelixScoreboard />);
+        </script>
+    </body>
+    </html>
+    
